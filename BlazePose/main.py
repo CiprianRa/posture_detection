@@ -7,6 +7,8 @@ alpha = 0.2
 delta_threshold = 0.005  # prag pentru ignorare zgomot
 shoulder_z_smoothed = None
 hip_z_smoothed = None
+shoulder_y_smoothed = None
+hip_y_smoothed = None
 
 # === Postură și temporizare ===
 current_posture = None
@@ -50,25 +52,37 @@ with mp_pose.Pose(
                               landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER].z) / 2
             hip_avg_z = (landmarks[mp_pose.PoseLandmark.LEFT_HIP].z +
                          landmarks[mp_pose.PoseLandmark.RIGHT_HIP].z) / 2
+            shoulder_avg_y = (landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER].y +
+                              landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER].y) / 2
+            hip_avg_y = (landmarks[mp_pose.PoseLandmark.LEFT_HIP].y +
+                         landmarks[mp_pose.PoseLandmark.RIGHT_HIP].y) / 2
 
             # Aplicăm filtrare adaptivă (EMA + threshold)
             if shoulder_z_smoothed is None:
                 shoulder_z_smoothed = shoulder_avg_z
                 hip_z_smoothed = hip_avg_z
+                shoulder_y_smoothed = shoulder_avg_y
+                hip_y_smoothed = hip_avg_y
             else:
                 shoulder_z_smoothed = smooth_with_threshold(shoulder_avg_z, shoulder_z_smoothed, alpha, delta_threshold)
                 hip_z_smoothed = smooth_with_threshold(hip_avg_z, hip_z_smoothed, alpha, delta_threshold)
+                shoulder_y_smoothed = smooth_with_threshold(shoulder_avg_y, shoulder_y_smoothed, alpha, delta_threshold)
+                hip_y_smoothed = smooth_with_threshold(hip_avg_y, hip_y_smoothed, alpha, delta_threshold)
 
             # Diferența z între șolduri și umeri
             z_diff = hip_z_smoothed - shoulder_z_smoothed
+            y_diff = hip_y_smoothed - shoulder_y_smoothed
 
             # Propunem o nouă postură
-            if z_diff > 0.14:
-                new_posture = "APLECAT"
-            elif z_diff < 0.12:
-                new_posture = "DREPT"
+            if y_diff < 0.5:
+                if z_diff > 0.14:
+                    new_posture = "APLECAT"
+                elif z_diff < 0.12:
+                    new_posture = "DREPT"
+                else:
+                    new_posture = current_posture
             else:
-                new_posture = current_posture
+                new_posture = "DREPT"
 
             # Aplicăm temporizare pentru schimbare postură
             if new_posture != current_posture:
